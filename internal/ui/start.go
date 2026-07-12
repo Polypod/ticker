@@ -25,6 +25,12 @@ func Start(dep *c.Dependencies, ctx *c.Context, version string) func() error {
 				BaseURL:      dep.MonitorPriceCoinbaseBaseURL,
 				StreamingURL: dep.MonitorPriceCoinbaseStreamingURL,
 			},
+			ConfigMonitorPriceTiingo: mon.ConfigMonitorPriceTiingo{
+				BaseURL:        dep.MonitorTiingoBaseURL,
+				StreamingURL:   dep.MonitorTiingoStreamingURL,
+				Token:          dep.MonitorTiingoToken,
+				ThresholdLevel: dep.MonitorTiingoThresholdLevel,
+			},
 		})
 
 		p := tea.NewProgram(

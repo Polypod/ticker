@@ -70,6 +70,7 @@ func init() { //nolint: gochecknoinits
 	rootCmd.Flags().StringVar(&options.Sort, "sort", "", "sort quotes on the UI. Set \"alpha\" to sort by ticker name. Set \"value\" to sort by position value. Keep empty to sort according to change percent")
 	rootCmd.Flags().BoolVar(&options.NoCache, "no-cache", false, "disable the on-disk cache of data retrieved at startup")
 	rootCmd.Flags().BoolVar(&options.Debug, "debug", false, "enable debug logging to ./ticker-log-<date>.log")
+	rootCmd.Flags().BoolVar(&options.AITrading, "ai-trading", false, "show a review-only market regime, risk, news, and AI trading brief")
 
 	printCmd.PersistentFlags().StringVar(&optionsPrint.Format, "format", "", "output format for printing holdings. Set \"csv\" to print as a CSV or \"json\" for JSON. Defaults to JSON.")
 	printCmd.PersistentFlags().StringVar(&configPath, "config", "", "config file (default is $HOME/.ticker.yaml)")

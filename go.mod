@@ -16,9 +16,11 @@ require (
 	github.com/muesli/termenv v0.16.0
 	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/gomega v1.42.1
+	github.com/osauer/ibkr v1.15.0
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
+	github.com/subosito/gotenv v1.6.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -198,7 +200,6 @@ require (
 	github.com/stbenjam/no-sprintf-host-port v0.3.1 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tetafro/godot v1.5.6 // indirect
 	github.com/timakin/bodyclose v0.0.0-20260129054331-73d1f95b84b4 // indirect
 	github.com/timonwong/loggercheck v0.11.0 // indirect

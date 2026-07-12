@@ -10,6 +10,7 @@ import (
 
 	c "github.com/achannarasappa/ticker/v5/internal/common"
 	monitorPriceCoinbase "github.com/achannarasappa/ticker/v5/internal/monitor/coinbase/monitor-price"
+	monitorPriceTiingo "github.com/achannarasappa/ticker/v5/internal/monitor/tiingo/monitor-price"
 	monitorCurrencyRate "github.com/achannarasappa/ticker/v5/internal/monitor/yahoo/monitor-currency-rates"
 	monitorPriceYahoo "github.com/achannarasappa/ticker/v5/internal/monitor/yahoo/monitor-price"
 	unaryClientYahoo "github.com/achannarasappa/ticker/v5/internal/monitor/yahoo/unary"
@@ -40,6 +41,7 @@ type ConfigMonitor struct {
 	Cache           c.Cache
 	ConfigMonitorPriceCoinbase
 	ConfigMonitorsYahoo
+	ConfigMonitorPriceTiingo
 }
 
 // ConfigMonitorPriceCoinbase represents the configuration for the Coinbase monitor
@@ -54,6 +56,14 @@ type ConfigMonitorsYahoo struct {
 	SessionRootURL    string
 	SessionCrumbURL   string
 	SessionConsentURL string
+}
+
+// ConfigMonitorPriceTiingo represents the configuration for the Tiingo IEX monitor.
+type ConfigMonitorPriceTiingo struct {
+	BaseURL        string
+	StreamingURL   string
+	Token          string
+	ThresholdLevel int
 }
 
 // ConfigUpdateFns represents the callback functions for when asset quotes are updated
@@ -83,6 +93,20 @@ func NewMonitor(configMonitor ConfigMonitor) (*Monitor, error) {
 		},
 		monitorPriceCoinbase.WithStreamingURL(configMonitor.ConfigMonitorPriceCoinbase.StreamingURL),
 		monitorPriceCoinbase.WithRefreshInterval(time.Duration(configMonitor.RefreshInterval)*time.Second),
+	)
+
+	tiingo := monitorPriceTiingo.NewMonitorPriceTiingo(
+		monitorPriceTiingo.Config{
+			Ctx:                      ctx,
+			BaseURL:                  configMonitor.ConfigMonitorPriceTiingo.BaseURL,
+			Cache:                    configMonitor.Cache,
+			StreamingURL:             configMonitor.ConfigMonitorPriceTiingo.StreamingURL,
+			Token:                    configMonitor.ConfigMonitorPriceTiingo.Token,
+			ThresholdLevel:           configMonitor.ConfigMonitorPriceTiingo.ThresholdLevel,
+			ChanError:                chanError,
+			ChanUpdateAssetQuote:     chanUpdateAssetQuote,
+			ChanRequestCurrencyRates: chanRequestCurrencyRate,
+		},
 	)
 
 	// Create and configure the API client for the Yahoo API shared between monitors
@@ -122,6 +146,7 @@ func NewMonitor(configMonitor ConfigMonitor) (*Monitor, error) {
 	m := &Monitor{
 		monitors: map[c.QuoteSource]c.Monitor{
 			c.QuoteSourceCoinbase: coinbase,
+			c.QuoteSourceTiingo:   tiingo,
 			c.QuoteSourceYahoo:    yahoo,
 		},
 		monitorCurrencyRate:     yahooCurrencyRate,

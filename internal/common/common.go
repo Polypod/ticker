@@ -48,11 +48,23 @@ type Config struct {
 	ColorScheme                       ConfigColorScheme  `yaml:"colors"`
 	AssetGroup                        []ConfigAssetGroup `yaml:"groups"`
 	Debug                             bool               `yaml:"debug"`
+	AITrading                         ConfigAITrading    `yaml:"ai-trading"`
 	// Cache enables the on-disk cache. It is a pointer so that an unset config
 	// value (nil) can be distinguished from an explicit false, allowing the
 	// cache to default to on while still being disableable via config or
 	// --no-cache.
 	Cache *bool `yaml:"cache"`
+}
+
+// ConfigAITrading controls the optional review-only trading brief panel.
+type ConfigAITrading struct {
+	Enabled               bool     `yaml:"enabled"`
+	RefreshMinutes        int      `yaml:"refresh-minutes"`
+	AccountRefreshSeconds int      `yaml:"account-refresh-seconds"`
+	NewsWindowHours       int      `yaml:"news-window-hours"`
+	MaxNewsPerSymbol      int      `yaml:"max-news-per-symbol"`
+	Model                 string   `yaml:"model"`
+	SatelliteWatchlist    []string `yaml:"satellite-watchlist"`
 }
 
 // ConfigColorScheme represents user defined color scheme
@@ -103,6 +115,16 @@ type Dependencies struct {
 	MonitorYahooSessionRootURL       string
 	MonitorYahooSessionCrumbURL      string
 	MonitorYahooSessionConsentURL    string
+	MonitorTiingoBaseURL             string
+	MonitorTiingoStreamingURL        string
+	MonitorTiingoToken               string
+	MonitorTiingoThresholdLevel      int
+	OpenAIAPIKey                     string
+	OpenAIBaseURL                    string
+	IBKRHost                         string
+	IBKRPort                         int
+	IBKRClientID                     int
+	IBKRAccountID                    string
 }
 
 type Monitor interface {
@@ -262,6 +284,7 @@ const (
 	QuoteSourceUnknown
 	QuoteSourceCoinCap
 	QuoteSourceCoinbase
+	QuoteSourceTiingo
 )
 
 // AssetQuote represents a price quote and related attributes for a single security

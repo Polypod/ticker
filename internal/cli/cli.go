@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/subosito/gotenv"
 	"gopkg.in/yaml.v2"
 )
 
@@ -34,6 +36,7 @@ type Options struct {
 	Sort                  string
 	NoCache               bool
 	Debug                 bool
+	AITrading             bool
 }
 
 type symbolSource struct {
@@ -119,6 +122,11 @@ func Validate(config *c.Config, options *Options, prevErr *error) func(*cobra.Co
 }
 
 func GetDependencies() c.Dependencies {
+	// A project-local .env is a convenience for local development. Existing
+	// environment variables take precedence, so exported credentials remain the
+	// source of truth in shells and production environments.
+	_ = gotenv.Load(".env")
+
 	return c.Dependencies{
 		Fs:                               afero.NewOsFs(),
 		SymbolsURL:                       "https://raw.githubusercontent.com/achannarasappa/ticker-static/master/symbols.csv",
@@ -129,7 +137,57 @@ func GetDependencies() c.Dependencies {
 		MonitorYahooSessionConsentURL:    "https://consent.yahoo.com",
 		MonitorPriceCoinbaseBaseURL:      "https://api.coinbase.com",
 		MonitorPriceCoinbaseStreamingURL: "wss://ws-feed.exchange.coinbase.com",
+		MonitorTiingoBaseURL:             "https://api.tiingo.com",
+		MonitorTiingoStreamingURL:        "wss://api.tiingo.com/iex",
+		MonitorTiingoToken:               os.Getenv("TIINGO_API_TOKEN"),
+		MonitorTiingoThresholdLevel:      tiingoThresholdLevel(),
+		OpenAIAPIKey:                     os.Getenv("OPENAI_API_KEY"),
+		OpenAIBaseURL:                    "https://api.openai.com/v1",
+		IBKRHost:                         ibkrHost(),
+		IBKRPort:                         ibkrPort(),
+		IBKRClientID:                     ibkrClientID(),
+		IBKRAccountID:                    os.Getenv("IBKR_ACCOUNT_ID"),
 	}
+}
+
+func ibkrHost() string {
+	host := strings.TrimSpace(os.Getenv("IBKR_HOST"))
+	if host == "" {
+		return "127.0.0.1"
+	}
+
+	return host
+}
+
+func ibkrPort() int {
+	return envInt("IBKR_PORT", 4001)
+}
+
+func ibkrClientID() int {
+	// Use an application-specific ID so ticker does not displace another
+	// TWS/Gateway client that may be using the conventional client ID 1.
+	return envInt("IBKR_CLIENT_ID", 73)
+}
+
+func envInt(name string, fallback int) int {
+	value, err := strconv.Atoi(strings.TrimSpace(os.Getenv(name)))
+	if err != nil || value <= 0 {
+		return fallback
+	}
+
+	return value
+}
+
+func tiingoThresholdLevel() int {
+
+	const defaultThresholdLevel = 6
+
+	thresholdLevel, err := strconv.Atoi(os.Getenv("TIINGO_IEX_THRESHOLD_LEVEL"))
+	if err != nil || thresholdLevel < 0 || thresholdLevel > 6 {
+		return defaultThresholdLevel
+	}
+
+	return thresholdLevel
 }
 
 // GetContext builds the context from the config and reference data
@@ -223,6 +281,7 @@ func GetConfig(dep c.Dependencies, configPath string, options Options) (c.Config
 	config.ExtraInfoExchange = getBoolOption(options.ExtraInfoExchange, config.ExtraInfoExchange)
 	config.ExtraInfoFundamentals = getBoolOption(options.ExtraInfoFundamentals, config.ExtraInfoFundamentals)
 	config.ShowSummary = getBoolOption(options.ShowSummary, config.ShowSummary)
+	config.AITrading.Enabled = getBoolOption(options.AITrading, config.AITrading.Enabled)
 	// Merge ShowHoldings into ShowPositions with positions taking precedence
 	// First check if Positions is set (CLI or config), then fall back to Holdings if not
 	showPositionsFromCLI := options.ShowPositions
@@ -441,6 +500,14 @@ func getSymbolAndSource(symbol string, tickerSymbolToSourceSymbol symbol.TickerS
 
 		}
 
+	}
+
+	if strings.HasSuffix(symbolUppercase, ".TI") {
+
+		return symbolSource{
+			source: c.QuoteSourceTiingo,
+			symbol: strings.TrimSuffix(symbolUppercase, ".TI"),
+		}
 	}
 
 	return symbolSource{

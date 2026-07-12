@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/achannarasappa/ticker/v5/internal/asset"
 	c "github.com/achannarasappa/ticker/v5/internal/common"
 	mon "github.com/achannarasappa/ticker/v5/internal/monitor"
+	"github.com/achannarasappa/ticker/v5/internal/tradingbrief"
 	"github.com/achannarasappa/ticker/v5/internal/ui/component/summary"
 	"github.com/achannarasappa/ticker/v5/internal/ui/component/watchlist"
 	"github.com/achannarasappa/ticker/v5/internal/ui/component/watchlist/row"
@@ -34,29 +36,32 @@ const (
 
 // Model for UI
 type Model struct {
-	ctx                c.Context
-	ready              bool
-	headerHeight       int
-	versionVector      int
-	requestInterval    int
-	assets             []c.Asset
-	assetQuotes        []c.AssetQuote
-	assetQuotesLookup  map[string]int
-	positionSummary    asset.PositionSummary
-	viewport           viewport.Model
-	watchlist          *watchlist.Model
-	summary            *summary.Model
-	lastUpdateTime     string
-	groupSelectedIndex int
-	groupMaxIndex      int
-	groupSelectedName  string
-	currentSort        string
-	monitors           *mon.Monitor
-	mu                 sync.RWMutex
-	version            string
-	latestVersion      string
-	releasesURL        string
-	fs                 afero.Fs
+	ctx                 c.Context
+	ready               bool
+	headerHeight        int
+	versionVector       int
+	requestInterval     int
+	assets              []c.Asset
+	assetQuotes         []c.AssetQuote
+	assetQuotesLookup   map[string]int
+	positionSummary     asset.PositionSummary
+	viewport            viewport.Model
+	watchlist           *watchlist.Model
+	summary             *summary.Model
+	lastUpdateTime      string
+	groupSelectedIndex  int
+	groupMaxIndex       int
+	groupSelectedName   string
+	currentSort         string
+	monitors            *mon.Monitor
+	mu                  sync.RWMutex
+	version             string
+	latestVersion       string
+	releasesURL         string
+	fs                  afero.Fs
+	tradingBrief        tradingbrief.Brief
+	tradingBriefService *tradingbrief.Service
+	tradingBriefRefresh time.Duration
 }
 
 type tickMsg struct {
@@ -66,6 +71,13 @@ type tickMsg struct {
 type updateCheckMsg string
 
 type updateCheckTickMsg struct{}
+
+type tradingBriefMsg struct {
+	brief         tradingbrief.Brief
+	versionVector int
+}
+
+type tradingBriefTickMsg struct{}
 
 type SetAssetQuoteMsg struct {
 	symbol        string
@@ -83,7 +95,7 @@ func NewModel(dep c.Dependencies, ctx c.Context, monitors *mon.Monitor, version 
 
 	groupMaxIndex := len(ctx.Groups) - 1
 
-	return &Model{
+	model := &Model{
 		ctx:               ctx,
 		headerHeight:      getVerticalMargin(ctx.Config),
 		ready:             false,
@@ -111,6 +123,34 @@ func NewModel(dep c.Dependencies, ctx c.Context, monitors *mon.Monitor, version 
 		releasesURL:        dep.GitHubReleasesURL,
 		fs:                 dep.Fs,
 	}
+	if ctx.Config.AITrading.Enabled {
+		refreshMinutes := ctx.Config.AITrading.RefreshMinutes
+		if refreshMinutes == 0 {
+			refreshMinutes = 15
+		}
+		accountRefreshSeconds := ctx.Config.AITrading.AccountRefreshSeconds
+		if accountRefreshSeconds == 0 {
+			accountRefreshSeconds = 60
+		}
+		model.tradingBriefRefresh = time.Duration(accountRefreshSeconds) * time.Second
+		model.tradingBriefService = tradingbrief.NewService(tradingbrief.Config{
+			AnalysisRefresh:    time.Duration(refreshMinutes) * time.Minute,
+			IBKRAccountID:      dep.IBKRAccountID,
+			IBKRClientID:       dep.IBKRClientID,
+			IBKRHost:           dep.IBKRHost,
+			IBKRPort:           dep.IBKRPort,
+			MaxNewsPerSymbol:   ctx.Config.AITrading.MaxNewsPerSymbol,
+			Model:              ctx.Config.AITrading.Model,
+			NewsWindowHours:    ctx.Config.AITrading.NewsWindowHours,
+			OpenAIAPIKey:       dep.OpenAIAPIKey,
+			OpenAIBaseURL:      dep.OpenAIBaseURL,
+			SatelliteWatchlist: ctx.Config.AITrading.SatelliteWatchlist,
+			TiingoBaseURL:      dep.MonitorTiingoBaseURL,
+			TiingoToken:        dep.MonitorTiingoToken,
+		})
+	}
+
+	return model
 }
 
 // Init is the initialization hook for bubbletea
@@ -118,7 +158,7 @@ func (m *Model) Init() tea.Cmd {
 	(*m.monitors).Start()
 
 	// Start renderer and set symbols in parallel
-	return tea.Batch(
+	cmds := []tea.Cmd{
 		tick(0),
 		updateCheckTick(),
 		func() tea.Msg {
@@ -133,11 +173,16 @@ func (m *Model) Init() tea.Cmd {
 		func() tea.Msg {
 			return updateCheckMsg(updater.Check(m.version, m.releasesURL, updater.CacheFilePath(), m.fs))
 		},
-	)
+	}
+	if m.tradingBriefService != nil {
+		cmds = append(cmds, tradingBriefTick(m.tradingBriefRefresh))
+	}
+
+	return tea.Batch(cmds...)
 }
 
 // Update hook for bubbletea
-func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:maintidx
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo,maintidx
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -292,7 +337,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:maintidx
 
 		m.groupSelectedName = m.ctx.Groups[m.groupSelectedIndex].Name
 
-		return m, nil
+		if m.tradingBriefService == nil {
+			return m, nil
+		}
+
+		if !m.tradingBrief.GeneratedAt.IsZero() {
+			return m, nil
+		}
+
+		return m, m.tradingBriefCmd(slices.Clone(m.assets), msg.versionVector)
 
 	case SetAssetQuoteMsg:
 
@@ -354,6 +407,26 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:maintidx
 				return updateCheckMsg(updater.Check(m.version, m.releasesURL, updater.CacheFilePath(), m.fs))
 			},
 		)
+
+	case tradingBriefTickMsg:
+		if m.tradingBriefService == nil {
+			return m, nil
+		}
+		m.mu.RLock()
+		assets := slices.Clone(m.assets)
+		versionVector := m.versionVector
+		m.mu.RUnlock()
+
+		return m, tea.Batch(m.tradingBriefCmd(assets, versionVector), tradingBriefTick(m.tradingBriefRefresh))
+
+	case tradingBriefMsg:
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		if msg.versionVector == m.versionVector {
+			m.tradingBrief = msg.brief
+		}
+
+		return m, nil
 	}
 
 	return m, nil
@@ -368,7 +441,11 @@ func (m *Model) View() string {
 		return "\n  Initializing..."
 	}
 
-	m.viewport.SetContent(m.watchlist.View())
+	content := m.watchlist.View()
+	if m.tradingBriefService != nil {
+		content += "\n\n" + m.tradingBrief.View(m.ctx.Reference.Styles)
+	}
+	m.viewport.SetContent(content)
 
 	viewSummary := ""
 
@@ -380,6 +457,23 @@ func (m *Model) View() string {
 		m.viewport.View() + "\n" +
 		footer(m.viewport.Width, m.lastUpdateTime, m.groupSelectedName, m.currentSort, m.latestVersion)
 
+}
+
+func (m *Model) tradingBriefCmd(assets []c.Asset, versionVector int) tea.Cmd {
+	return func() tea.Msg {
+		brief, err := m.tradingBriefService.Analyze(assets)
+		if err != nil {
+			brief.Status = "Trading brief unavailable: " + err.Error()
+		}
+
+		return tradingBriefMsg{brief: brief, versionVector: versionVector}
+	}
+}
+
+func tradingBriefTick(interval time.Duration) tea.Cmd {
+	return tea.Tick(interval, func(time.Time) tea.Msg {
+		return tradingBriefTickMsg{}
+	})
 }
 
 func footer(width int, time string, groupSelectedName string, currentSort string, latestVersion string) string {

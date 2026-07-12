@@ -89,6 +89,7 @@ ticker -w NET,AAPL,TSLA
 |`version`          |  |--version          |                |print the current version number|
 |`cache`            |  |--no-cache         |`true`          |cache data retrieved at startup|
 |`debug`            |  |--debug            |                |enable debug logging to `./ticker-log-<date>.log`|
+|`ai-trading`       |  |--ai-trading       |                |show a review-only regime, risk, news, and AI trading brief|
 
 ## Configuration
 
@@ -101,6 +102,17 @@ show-tags: true
 show-fundamentals: true
 show-separator: true
 show-positions: true
+ai-trading:
+  enabled: true
+  # Read the cached IBKR account/portfolio stream every minute. Tiingo News
+  # and the AI synthesis still follow refresh-minutes below.
+  account-refresh-seconds: 60
+  refresh-minutes: 15
+  news-window-hours: 24
+  max-news-per-symbol: 3
+  model: gpt-5-mini
+  # Symbols reviewed even when they are not held.
+  satellite-watchlist: [CAMT.TI, NVTS.TI, AMBA.TI, FORM.TI, NVDA.TI]
 interval: 5
 currency: USD
 currency-summary-only: false
@@ -139,6 +151,20 @@ groups:
 * `.ticker.yaml` can be set in user home directory, the current directory, or [XDG config home](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html)
 * Quantities can be negative to represent closed positions (position netting), short positions, borrowed assets, and other concepts
 
+### AI trading brief
+
+Enable the optional review-only panel with `--ai-trading` or the `ai-trading.enabled` configuration property. It appears below the watchlist and combines Tiingo market proxies, risk flags derived from the tracked positions, and a bounded Tiingo News snapshot.
+
+```sh
+ticker --ai-trading
+```
+
+When `OPENAI_API_KEY` is available, ticker additionally requests a schema-constrained AI synthesis from the Responses API using the configured model. The request sets `store: false`. Without this key, the panel still shows deterministic regime, risk, and news information. The brief never places orders or issues executable instructions; all suggested actions require human review.
+
+To include live account balances and positions, run TWS or IB Gateway with its socket API enabled (the usual local IB Gateway port is `4001`). Ticker defaults to `127.0.0.1:4001` and client ID `73`; override them with `IBKR_HOST`, `IBKR_PORT`, and `IBKR_CLIENT_ID`. `IBKR_ACCOUNT_ID` is optional for a single-account login.
+
+Ticker makes one `reqAccountUpdates` subscription and renders its locally cached account/portfolio values. It does **not** request IBKR market-data snapshots, P&L subscriptions, quotes, historical data, or place/cancel/modify orders. If the gateway is down, the Tiingo-backed brief remains available and the panel reports the broker stream state; if it disconnects after data was received, the last account view is clearly marked stale.
+
 ### Display Options
 
 With  `--show-summary`, `--show-tags`, `--show-fundamentals`, `--show-positions`, and `--show-separator` options set, the layout and information displayed expands:
@@ -169,8 +195,22 @@ Watchlists and lots can be grouped in `.ticker.yml` under the `groups` property.
 * `.X` - symbols with this suffix are shorthand symbols that are specific to ticker and intended to provide more concise and familiar symbols for popular assets (e.g. using `SOL.X` rather than `SOLANA.CG`)
   * The full list of ticker symbols can be found [here](https://github.com/achannarasappa/ticker-static/blob/master/symbols.csv). Initial values are populated with the top cryptocurrencies by volume on Coinbase at the time of update
 * `.CB` - symbols with this suffix will use Coinbase as the data source. The symbol can be found by searching for the asset on [Coinbase](https://www.coinbase.com/explore/s/listed) and finding the symbol for the asset. (e.g. for Starknet check the [market page](https://www.coinbase.com/advanced-trade/spot/STRK-USD) to find the symbol `STRK` and set the symbol to `STRK.CB` in ticker).
+* `.TI` - symbols with this suffix use Tiingo's IEX data feed (e.g. `AAPL.TI`). Tiingo supplies an initial REST snapshot and ticker receives subsequent reference-price updates through its WebSocket feed.
 
 Note: Coincap (`.CC`) and CoinGecko (`.CG`) are no longer supported after v5.0.0
+
+### Tiingo setup
+
+Tiingo requires an API token. Keep it out of the configuration file and provide it through the environment instead:
+
+```sh
+export TIINGO_API_TOKEN="your-token"
+ticker -w AAPL.TI,MSFT.TI
+```
+
+Ticker subscribes to Tiingo's entitlement-safe reference-price WebSocket mode (`thresholdLevel: 6`) by default. If your Tiingo/IEX agreement permits a different threshold level, set `TIINGO_IEX_THRESHOLD_LEVEL` to an integer from `0` to `6` before starting ticker. The REST snapshot and the WebSocket reference price use Tiingo's `tngoLast` field; this may be a derived reference price rather than a raw IEX last sale without the required IEX market-data entitlement.
+
+For Tiingo symbols, ticker enriches the live IEX quote with a 52-week high/low calculated from Tiingo EOD history and caches it for 24 hours. It also requests market capitalization from Tiingo's daily Fundamentals endpoint and caches that result for 24 hours. Fundamentals are optional: if the account is not entitled to that add-on, quotes and the 52-week range continue to work, while market capitalization remains unavailable.
 
 ### Currency Conversion
 

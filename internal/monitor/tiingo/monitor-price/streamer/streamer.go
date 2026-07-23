@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -311,7 +312,8 @@ func parseReferencePriceData(data json.RawMessage) ([]QuoteUpdate, error) {
 				return nil, fmt.Errorf("decode Tiingo IEX reference price: %w", err)
 			}
 
-			return []QuoteUpdate{{Symbol: symbol, Price: price}}, nil
+			// Websocket ticks are often lowercase; REST snapshots use uppercase.
+			return []QuoteUpdate{{Symbol: strings.ToUpper(symbol), Price: price}}, nil
 		}
 	}
 

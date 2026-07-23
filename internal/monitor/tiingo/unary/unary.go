@@ -104,9 +104,13 @@ func transformResponseQuote(responseQuote ResponseQuote) c.AssetQuote {
 		changePercent = change / responseQuote.PrevClose * 100
 	}
 
+	// Tiingo may return mixed-case tickers; normalize so REST cache keys match
+	// websocket updates (which are often lowercase).
+	ticker := strings.ToUpper(responseQuote.Ticker)
+
 	return c.AssetQuote{
-		Name:   responseQuote.Ticker,
-		Symbol: responseQuote.Ticker + ".TI",
+		Name:   ticker,
+		Symbol: ticker + ".TI",
 		Class:  c.AssetClassStock,
 		Currency: c.Currency{
 			FromCurrencyCode: "USD",
@@ -128,6 +132,6 @@ func transformResponseQuote(responseQuote ResponseQuote) c.AssetQuote {
 			IsActive:                responseQuote.TngoLast != 0,
 			IsRegularTradingSession: true,
 		},
-		Meta: c.Meta{SymbolInSourceAPI: responseQuote.Ticker},
+		Meta: c.Meta{SymbolInSourceAPI: ticker},
 	}
 }

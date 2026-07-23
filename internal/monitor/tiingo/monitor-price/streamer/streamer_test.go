@@ -27,6 +27,21 @@ func TestParseReferencePriceUpdates(t *testing.T) {
 	}
 }
 
+func TestParseReferencePriceUpdatesNormalizesTickerCase(t *testing.T) {
+	t.Parallel()
+
+	// Live Tiingo IEX websocket messages use lowercase tickers.
+	data := json.RawMessage(`["2026-07-11T13:30:00Z","nvda",208.47]`)
+	updates, err := parseReferencePriceUpdates(message{MessageType: "A", Data: data})
+	if err != nil {
+		t.Fatalf("parseReferencePriceUpdates() error = %v", err)
+	}
+	want := []QuoteUpdate{{Symbol: "NVDA", Price: 208.47}}
+	if !reflect.DeepEqual(updates, want) {
+		t.Fatalf("updates = %#v, want %#v", updates, want)
+	}
+}
+
 func TestParseReferencePriceUpdatesBatch(t *testing.T) {
 	t.Parallel()
 

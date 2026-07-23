@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -308,7 +309,10 @@ func (m *MonitorPriceTiingo) handleStreamUpdates() {
 				continue
 			}
 
-			assetQuote, exists := m.assetQuotesCacheLookup[update.ID]
+			// Tiingo REST returns uppercase tickers; the IEX websocket often
+			// emits lowercase ones. Normalize so stream updates hit the cache.
+			symbol := strings.ToUpper(update.ID)
+			assetQuote, exists := m.assetQuotesCacheLookup[symbol]
 			if !exists {
 				m.mu.Unlock()
 

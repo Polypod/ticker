@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/achannarasappa/ticker/v5/internal/cache"
 	c "github.com/achannarasappa/ticker/v5/internal/common"
+	"github.com/achannarasappa/ticker/v5/internal/monitor/tiingo/monitor-price/streamer"
 	"github.com/spf13/afero"
 )
 
@@ -152,5 +154,59 @@ func TestReferenceDataIsSharedThroughTheStartupCache(t *testing.T) {
 	}
 	if eodRequests != 1 || fundamentalsRequests != 1 {
 		t.Fatalf("reference requests = EOD %d, fundamentals %d; want 1 each", eodRequests, fundamentalsRequests)
+	}
+}
+
+func TestStreamUpdatesMatchCacheDespiteTickerCase(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/iex/NVDA":
+			_, _ = w.Write([]byte(`[{"ticker":"NVDA","tngoLast":200,"prevClose":195,"open":196,"high":201,"low":194,"volume":12345}]`))
+		case "/tiingo/daily/NVDA/prices":
+			_, _ = w.Write([]byte(`[{"high":210,"low":150}]`))
+		case "/tiingo/fundamentals/NVDA/daily":
+			_, _ = w.Write([]byte(`[{"marketCap":3000000000000}]`))
+		default:
+			t.Errorf("unexpected request path = %q", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	updates := make(chan c.MessageUpdate[c.AssetQuote], 1)
+	monitor := NewMonitorPriceTiingo(Config{
+		BaseURL:                  server.URL,
+		Ctx:                      context.Background(),
+		Token:                    "test-token",
+		StreamingURL:             "ws://example.test/iex",
+		ChanError:                make(chan error, 1),
+		ChanRequestCurrencyRates: make(chan []string, 1),
+		ChanUpdateAssetQuote:     updates,
+	})
+	if err := monitor.SetSymbols([]string{"NVDA"}, 1); err != nil {
+		t.Fatalf("SetSymbols() error = %v", err)
+	}
+
+	go monitor.handleStreamUpdates()
+
+	// Live Tiingo IEX websocket emits lowercase tickers.
+	monitor.chanStreamUpdate <- c.MessageUpdate[streamer.QuoteUpdate]{
+		ID:            "nvda",
+		VersionVector: 1,
+		Data: streamer.QuoteUpdate{
+			Symbol: "nvda",
+			Price:  208.47,
+		},
+	}
+
+	select {
+	case update := <-updates:
+		if update.Data.Symbol != "NVDA.TI" || update.Data.QuotePrice.Price != 208.47 {
+			t.Fatalf("unexpected asset quote update: %#v", update.Data)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("did not receive asset quote update for lowercase websocket ticker")
 	}
 }

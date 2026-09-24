@@ -44,6 +44,11 @@ struct ContentView: View {
     /// with the system accent, which is the blue that keeps coming back.
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 4) {
+            // A real laid-out view, not padding: the sidebar container
+            // collapses top padding, which is how the traffic lights kept
+            // landing on the first row.
+            Color.clear.frame(height: 44)
+
             ForEach(Section.allCases) { item in
                 Button {
                     section = item
@@ -65,8 +70,6 @@ struct ContentView: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 10)
-        // Clears the traffic lights, which sit over the sidebar on macOS.
-        .padding(.top, 44)
     }
 
     @ViewBuilder

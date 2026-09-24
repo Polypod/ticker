@@ -60,11 +60,30 @@ extension View {
 }
 
 extension Double {
-    var currency: String {
-        formatted(.number.precision(.fractionLength(2)))
+    /// Mirrors the terminal UI's variable precision: small prices need more
+    /// decimals to say anything at all.
+    func price(_ variable: Bool) -> String {
+        let digits = variable && abs(self) < 10 ? 4 : 2
+
+        return formatted(.number.precision(.fractionLength(digits)))
+    }
+
+    func signed(_ variable: Bool) -> String {
+        (self < 0 ? "" : "+") + price(variable)
     }
 
     var signedPercent: String {
         (self < 0 ? "" : "+") + formatted(.number.precision(.fractionLength(2))) + "%"
+    }
+
+    /// Market cap and volume are unreadable in full.
+    var abbreviated: String {
+        let units: [(Double, String)] = [(1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "K")]
+
+        for (scale, suffix) in units where abs(self) >= scale {
+            return (self / scale).formatted(.number.precision(.fractionLength(2))) + suffix
+        }
+
+        return formatted(.number.precision(.fractionLength(0)))
     }
 }

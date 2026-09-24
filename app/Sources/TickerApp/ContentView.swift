@@ -26,12 +26,12 @@ struct ContentView: View {
             }
             .navigationSplitViewColumnWidth(min: 170, ideal: 190)
             .scrollContentBackground(.hidden)
-            // System blue fights the monochrome palette.
-            .tint(Theme.up.opacity(0.55))
         } detail: {
             detail
         }
         .background(Theme.backdrop)
+        // System blue fights the monochrome palette.
+        .tint(Theme.up.opacity(0.6))
         .preferredColorScheme(.dark)
         .task { client.start() }
     }
@@ -95,36 +95,223 @@ struct AssetRow: View {
     let source: String
     let age: TimeInterval
 
+    /// A price that moved should be visible without reading the number, the way
+    /// the terminal UI flashes the row.
+    @State private var flashColor: Color = .clear
+    @State private var flashOpacity: Double = 0
+
+    private var variable: Bool { asset.meta.isVariablePrecision }
+
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(asset.symbol)
-                    .font(.system(.title3, design: .monospaced, weight: .semibold))
-                    .foregroundStyle(Theme.primaryText)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 7) {
+                        Text(asset.symbol)
+                            .font(.system(.title3, design: .monospaced, weight: .semibold))
+                            .foregroundStyle(Theme.primaryText)
 
-                Text(asset.name.isEmpty ? asset.exchange.name : asset.name)
-                    .font(.caption)
-                    .foregroundStyle(Theme.secondaryText)
-                    .lineLimit(1)
-            }
+                        // Open market, same signal the TUI's dot carries.
+                        Circle()
+                            .fill(asset.exchange.isRegularTradingSession ? Theme.up : Theme.secondaryText)
+                            .frame(width: 5, height: 5)
+                    }
 
-            Spacer(minLength: 12)
+                    Text(asset.name.isEmpty ? asset.exchange.name : asset.name)
+                        .font(.caption)
+                        .foregroundStyle(Theme.secondaryText)
+                        .lineLimit(1)
+                }
 
-            VStack(alignment: .trailing, spacing: 3) {
-                Text(asset.quotePrice.price.currency)
-                    .font(.system(.title3, design: .monospaced))
-                    .foregroundStyle(Theme.primaryText)
+                Spacer(minLength: 12)
 
-                Text(asset.quotePrice.changePercent.signedPercent)
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text(asset.quotePrice.price.price(variable))
+                        .font(.system(.title3, design: .monospaced))
+                        .foregroundStyle(Theme.primaryText)
+
+                    Text(
+                        asset.quotePrice.change.signed(variable)
+                            + "  "
+                            + asset.quotePrice.changePercent.signedPercent
+                    )
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(Theme.direction(asset.quotePrice.changePercent))
+                }
+
+                ProvenanceTag(source: source, age: age)
             }
 
-            ProvenanceTag(source: source, age: age)
+            StatStrip(items: quoteStats)
+
+            if asset.position.quantity > 0 {
+                StatStrip(items: positionStats, tint: Theme.direction(asset.position.totalChange.percent))
+            }
+
+            TagStrip(asset: asset)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
+        .background(flashColor.opacity(flashOpacity))
         .panel()
+        .onChange(of: asset.quotePrice.price, initial: false) { previous, current in
+            guard current != previous else { return }
+
+            flashColor = current > previous ? Theme.up : Theme.down
+            flashOpacity = 0.28
+
+            withAnimation(.easeOut(duration: 1.1)) {
+                flashOpacity = 0
+            }
+        }
+    }
+
+    private var quoteStats: [Stat] {
+        var stats: [Stat] = []
+
+        if asset.quotePrice.pricePrevClose != 0 {
+            stats.append(Stat("prev", asset.quotePrice.pricePrevClose.price(variable)))
+        }
+
+        if asset.quotePrice.priceOpen != 0 {
+            stats.append(Stat("open", asset.quotePrice.priceOpen.price(variable)))
+        }
+
+        if asset.quotePrice.priceDayHigh != 0, asset.quotePrice.priceDayLow != 0 {
+            stats.append(Stat(
+                "day",
+                asset.quotePrice.priceDayLow.price(variable) + "–" + asset.quotePrice.priceDayHigh.price(variable)
+            ))
+        }
+
+        if asset.quoteExtended.fiftyTwoWeekHigh != 0, asset.quoteExtended.fiftyTwoWeekLow != 0 {
+            stats.append(Stat(
+                "52wk",
+                asset.quoteExtended.fiftyTwoWeekLow.price(variable)
+                    + "–"
+                    + asset.quoteExtended.fiftyTwoWeekHigh.price(variable)
+            ))
+        }
+
+        if asset.quoteExtended.marketCap != 0 {
+            stats.append(Stat("mcap", asset.quoteExtended.marketCap.abbreviated))
+        }
+
+        if asset.quoteExtended.volume != 0 {
+            stats.append(Stat("vol", asset.quoteExtended.volume.abbreviated))
+        }
+
+        return stats
+    }
+
+    private var positionStats: [Stat] {
+        [
+            Stat("qty", asset.position.quantity.price(variable)),
+            Stat("avg", asset.position.unitCost.price(variable)),
+            Stat("value", asset.position.value.price(false)),
+            Stat("weight", asset.position.weight.signedPercent.replacingOccurrences(of: "+", with: "")),
+            Stat(
+                "total",
+                asset.position.totalChange.amount.signed(false)
+                    + " "
+                    + asset.position.totalChange.percent.signedPercent,
+                highlighted: true
+            ),
+            Stat(
+                "day",
+                asset.position.dayChange.amount.signed(false)
+                    + " "
+                    + asset.position.dayChange.percent.signedPercent,
+                highlighted: true
+            )
+        ]
+    }
+}
+
+struct Stat: Identifiable {
+    let id = UUID()
+    let label: String
+    let value: String
+    let highlighted: Bool
+
+    init(_ label: String, _ value: String, highlighted: Bool = false) {
+        self.label = label
+        self.value = value
+        self.highlighted = highlighted
+    }
+}
+
+struct StatStrip: View {
+    let items: [Stat]
+    var tint: Color = Theme.primaryText
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ForEach(items) { item in
+                HStack(spacing: 5) {
+                    Text(item.label.uppercased())
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(Theme.secondaryText)
+
+                    Text(item.value)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(item.highlighted ? tint : Theme.primaryText.opacity(0.75))
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// Currency, quote delay and exchange — the terminal UI's `--show-tags`.
+struct TagStrip: View {
+    let asset: Asset
+
+    private var tags: [String] {
+        var values: [String] = []
+
+        if !asset.currency.fromCurrencyCode.isEmpty {
+            let converted = asset.currency.toCurrencyCode
+
+            values.append(
+                converted.isEmpty || converted == asset.currency.fromCurrencyCode
+                    ? asset.currency.fromCurrencyCode
+                    : "\(asset.currency.fromCurrencyCode) → \(converted)"
+            )
+        }
+
+        if !asset.exchange.delayText.isEmpty {
+            values.append(asset.exchange.delayText)
+        } else if asset.exchange.delay > 0 {
+            values.append("delayed \(Int(asset.exchange.delay))m")
+        } else {
+            values.append("real-time")
+        }
+
+        if !asset.exchange.name.isEmpty {
+            values.append(asset.exchange.name)
+        }
+
+        return values
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(tags, id: \.self) { tag in
+                Text(tag)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(Theme.secondaryText)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.white.opacity(0.06))
+                    )
+            }
+
+            Spacer(minLength: 0)
+        }
     }
 }
 
@@ -161,9 +348,18 @@ struct SummaryBar: View {
 
     var body: some View {
         HStack(spacing: 22) {
-            metric("Value", summary.value.currency, Theme.primaryText)
-            metric("Day", summary.dayChange.percent.signedPercent, Theme.direction(summary.dayChange.percent))
-            metric("Total", summary.totalChange.percent.signedPercent, Theme.direction(summary.totalChange.percent))
+            metric("Value", summary.value.price(false), Theme.primaryText)
+            metric("Cost", summary.cost.price(false), Theme.primaryText.opacity(0.7))
+            metric(
+                "Day",
+                summary.dayChange.amount.signed(false) + "  " + summary.dayChange.percent.signedPercent,
+                Theme.direction(summary.dayChange.percent)
+            )
+            metric(
+                "Total",
+                summary.totalChange.amount.signed(false) + "  " + summary.totalChange.percent.signedPercent,
+                Theme.direction(summary.totalChange.percent)
+            )
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 12)

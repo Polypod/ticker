@@ -9,6 +9,5 @@ struct TickerApp: App {
         }
         // 16:9, matching the concept's proportions rather than a square window.
         .defaultSize(width: 1280, height: 720)
-        .windowStyle(.hiddenTitleBar)
     }
 }

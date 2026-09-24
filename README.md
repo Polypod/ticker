@@ -328,6 +328,11 @@ go run . print --format csv
 go run . print summary
 ```
 
+Running the macOS app (`app/`), which reads the daemon started above:
+```sh
+cd app && swift run
+```
+
 Running tests:
 ```sh
 go tool ginkgo -cover ./...

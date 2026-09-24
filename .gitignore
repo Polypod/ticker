@@ -8,6 +8,10 @@
 !docs
 !docs/*
 !docs/**/*
+!app
+!app/**/*
+app/.build
+app/.swiftpm
 !main.go
 !README.md
 !LICENSE

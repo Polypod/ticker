@@ -20,13 +20,8 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(Section.allCases, selection: $section) { item in
-                Label(item.rawValue, systemImage: item.icon)
-                    .tag(item)
-            }
-            .navigationSplitViewColumnWidth(min: 170, ideal: 190)
-            .scrollContentBackground(.hidden)
-            .safeAreaInset(edge: .top) { titleBarSpacer }
+            sidebar
+                .navigationSplitViewColumnWidth(min: 170, ideal: 190)
         } detail: {
             detail
                 .safeAreaInset(edge: .top) { titleBarSpacer }
@@ -42,6 +37,36 @@ struct ContentView: View {
     /// window title land on top of the first row without this.
     private var titleBarSpacer: some View {
         Color.clear.frame(height: 34)
+    }
+
+    /// Hand-rolled rather than a `List`: inside a split view the list manages
+    /// its own insets (so it ignored the title bar spacer) and paints selection
+    /// with the system accent, which is the blue that keeps coming back.
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Section.allCases) { item in
+                Button {
+                    section = item
+                } label: {
+                    Label(item.rawValue, systemImage: item.icon)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(section == item ? Theme.primaryText : Theme.secondaryText)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(section == item ? Color.white.opacity(0.12) : .clear)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        // Clears the traffic lights, which sit over the sidebar on macOS.
+        .padding(.top, 44)
     }
 
     @ViewBuilder

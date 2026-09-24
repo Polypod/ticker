@@ -124,6 +124,10 @@ func NewModel(dep c.Dependencies, ctx c.Context, monitors *mon.Monitor, version 
 		fs:                 dep.Fs,
 	}
 	if ctx.Config.AITrading.Enabled {
+		aiModel := ctx.Config.AITrading.Model
+		if dep.OpenAIModel != "" {
+			aiModel = dep.OpenAIModel
+		}
 		refreshMinutes := ctx.Config.AITrading.RefreshMinutes
 		if refreshMinutes == 0 {
 			refreshMinutes = 15
@@ -134,19 +138,25 @@ func NewModel(dep c.Dependencies, ctx c.Context, monitors *mon.Monitor, version 
 		}
 		model.tradingBriefRefresh = time.Duration(accountRefreshSeconds) * time.Second
 		model.tradingBriefService = tradingbrief.NewService(tradingbrief.Config{
-			AnalysisRefresh:    time.Duration(refreshMinutes) * time.Minute,
-			IBKRAccountID:      dep.IBKRAccountID,
-			IBKRClientID:       dep.IBKRClientID,
-			IBKRHost:           dep.IBKRHost,
-			IBKRPort:           dep.IBKRPort,
-			MaxNewsPerSymbol:   ctx.Config.AITrading.MaxNewsPerSymbol,
-			Model:              ctx.Config.AITrading.Model,
-			NewsWindowHours:    ctx.Config.AITrading.NewsWindowHours,
-			OpenAIAPIKey:       dep.OpenAIAPIKey,
-			OpenAIBaseURL:      dep.OpenAIBaseURL,
-			SatelliteWatchlist: ctx.Config.AITrading.SatelliteWatchlist,
-			TiingoBaseURL:      dep.MonitorTiingoBaseURL,
-			TiingoToken:        dep.MonitorTiingoToken,
+			AnalysisRefresh:             time.Duration(refreshMinutes) * time.Minute,
+			IBKRAccountID:               dep.IBKRAccountID,
+			IBKRClientID:                dep.IBKRClientID,
+			IBKRHost:                    dep.IBKRHost,
+			IBKRPort:                    dep.IBKRPort,
+			MaxNewsPerSymbol:            ctx.Config.AITrading.MaxNewsPerSymbol,
+			Model:                       aiModel,
+			NewsWindowHours:             ctx.Config.AITrading.NewsWindowHours,
+			OpenAIAPIKey:                dep.OpenAIAPIKey,
+			OpenAIBaseURL:               dep.OpenAIBaseURL,
+			ScrapeCreatorsAPIKey:        dep.ScrapeCreatorsAPIKey,
+			ScrapeCreatorsBaseURL:       dep.ScrapeCreatorsBaseURL,
+			ScrapeCreatorsSocialSources: dep.ScrapeCreatorsSocialSources,
+			XAIAPIKey:                   dep.XAIAPIKey,
+			XAIBaseURL:                  dep.XAIBaseURL,
+			XAIModel:                    dep.XAIModel,
+			SatelliteWatchlist:          ctx.Config.AITrading.SatelliteWatchlist,
+			TiingoBaseURL:               dep.MonitorTiingoBaseURL,
+			TiingoToken:                 dep.MonitorTiingoToken,
 		})
 	}
 

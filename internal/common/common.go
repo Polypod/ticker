@@ -121,6 +121,13 @@ type Dependencies struct {
 	MonitorTiingoThresholdLevel      int
 	OpenAIAPIKey                     string
 	OpenAIBaseURL                    string
+	OpenAIModel                      string
+	ScrapeCreatorsAPIKey             string
+	ScrapeCreatorsBaseURL            string
+	ScrapeCreatorsSocialSources      string
+	XAIAPIKey                        string
+	XAIBaseURL                       string
+	XAIModel                         string
 	IBKRHost                         string
 	IBKRPort                         int
 	IBKRClientID                     int

@@ -69,7 +69,7 @@ var _ = Describe("Cli", func() {
 			ExtraInfoExchange:     false,
 			ExtraInfoFundamentals: false,
 			ShowSummary:           false,
-			ShowPositions:          false,
+			ShowPositions:         false,
 			Sort:                  "",
 		}
 		dep = c.Dependencies{
@@ -584,6 +584,15 @@ var _ = Describe("Cli", func() {
 
 			Expect(output).To(expected)
 
+		})
+
+		It("reads the OpenAI model from the environment", func() {
+			Expect(os.Setenv("OPENAI_MODEL", "gpt-4.1-mini")).To(Succeed())
+			DeferCleanup(os.Unsetenv, "OPENAI_MODEL")
+
+			output := GetDependencies()
+
+			Expect(output.OpenAIModel).To(Equal("gpt-4.1-mini"))
 		})
 
 	})

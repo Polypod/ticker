@@ -153,13 +153,29 @@ groups:
 
 ### AI trading brief
 
-Enable the optional review-only panel with `--ai-trading` or the `ai-trading.enabled` configuration property. It appears below the watchlist and combines Tiingo market proxies, risk flags derived from the tracked positions, and a bounded Tiingo News snapshot.
+Enable the optional review-only panel with `--ai-trading` or the `ai-trading.enabled` configuration property. It appears below the watchlist and combines Tiingo market proxies, risk flags derived from the tracked positions, and a bounded Tiingo News snapshot. Optionally, it can also add recent public Reddit discussions for the active watchlist through ScrapeCreators; satellite symbols remain Tiingo-only.
 
 ```sh
 ticker --ai-trading
 ```
 
-When `OPENAI_API_KEY` is available, ticker additionally requests a schema-constrained AI synthesis from the Responses API using the configured model. The request sets `store: false`. Without this key, the panel still shows deterministic regime, risk, and news information. The brief never places orders or issues executable instructions; all suggested actions require human review.
+When `OPENAI_API_KEY` is available, ticker additionally requests a schema-constrained AI synthesis from the Responses API using the configured model. The request sets `store: false`. Set `OPENAI_MODEL` in `.env` (or the process environment) to override `ai-trading.model` without changing your YAML; the default remains `gpt-5-mini` when neither is set. Without an API key, the panel still shows deterministic regime, risk, and news information. The brief never places orders or issues executable instructions; all suggested actions require human review.
+
+Ticker loads a project-local `.env` at startup; exported environment variables take precedence over it.
+
+```sh
+# .env
+OPENAI_API_KEY=your_openai_key
+OPENAI_MODEL=gpt-5-mini
+SCRAPECREATORS_API_KEY=your_scrapecreators_key
+# Defaults: reddit,threads,linkedin,x. TikTok and YouTube are opt-in.
+SCRAPECREATORS_SOCIAL_SOURCES=reddit,threads,linkedin,x
+# X uses Grok's X Search tool, not ScrapeCreators' profile timelines.
+XAI_API_KEY=your_xai_key
+XAI_MODEL=grok-4.5
+```
+
+Tiingo News remains the required market-news baseline. When `SCRAPECREATORS_API_KEY` is set, ticker supplements it with public Reddit, Threads, and LinkedIn items. X is independently supplied by Grok X Search when `XAI_API_KEY` is set; it is unavailable without that key but never blocks Tiingo or the rest of the brief. TikTok and YouTube are disabled unless added to `SCRAPECREATORS_SOCIAL_SOURCES`. Each selected source is bounded to one item per active ticker per uncached brief refresh, except Reddit which retains up to `max-news-per-symbol` posts. Social-source failures appear as non-sensitive status messages. Pinterest and Instagram are intentionally excluded: Pinterest is not relevant for this use case, while Instagram's documented search endpoint does not return posts.
 
 To include live account balances and positions, run TWS or IB Gateway with its socket API enabled (the usual local IB Gateway port is `4001`). Ticker defaults to `127.0.0.1:4001` and client ID `73`; override them with `IBKR_HOST`, `IBKR_PORT`, and `IBKR_CLIENT_ID`. `IBKR_ACCOUNT_ID` is optional for a single-account login.
 
@@ -286,6 +302,13 @@ $ ticker --config=./.ticker.yaml print
 * [alpaca-ticker-config](https://www.npmjs.com/package/alpaca-ticker-config) - Pull [alpaca.markets](https://alpaca.markets) positions into `.ticker.yaml` from the command line
 
 ## Development
+
+Running from source:
+```sh
+go run . -w NET,AAPL,TSLA
+go run . print --format csv
+go run . print summary
+```
 
 Running tests:
 ```sh

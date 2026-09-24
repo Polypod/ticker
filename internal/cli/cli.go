@@ -143,11 +143,27 @@ func GetDependencies() c.Dependencies {
 		MonitorTiingoThresholdLevel:      tiingoThresholdLevel(),
 		OpenAIAPIKey:                     os.Getenv("OPENAI_API_KEY"),
 		OpenAIBaseURL:                    "https://api.openai.com/v1",
+		OpenAIModel:                      strings.TrimSpace(os.Getenv("OPENAI_MODEL")),
+		ScrapeCreatorsAPIKey:             strings.TrimSpace(os.Getenv("SCRAPECREATORS_API_KEY")),
+		ScrapeCreatorsBaseURL:            envURL("SCRAPECREATORS_BASE_URL", "https://api.scrapecreators.com"),
+		ScrapeCreatorsSocialSources:      strings.TrimSpace(os.Getenv("SCRAPECREATORS_SOCIAL_SOURCES")),
+		XAIAPIKey:                        strings.TrimSpace(os.Getenv("XAI_API_KEY")),
+		XAIBaseURL:                       envURL("XAI_BASE_URL", "https://api.x.ai/v1"),
+		XAIModel:                         strings.TrimSpace(os.Getenv("XAI_MODEL")),
 		IBKRHost:                         ibkrHost(),
 		IBKRPort:                         ibkrPort(),
 		IBKRClientID:                     ibkrClientID(),
 		IBKRAccountID:                    os.Getenv("IBKR_ACCOUNT_ID"),
 	}
+}
+
+func envURL(name, fallback string) string {
+	value := strings.TrimRight(strings.TrimSpace(os.Getenv(name)), "/")
+	if value == "" {
+		return fallback
+	}
+
+	return value
 }
 
 func ibkrHost() string {

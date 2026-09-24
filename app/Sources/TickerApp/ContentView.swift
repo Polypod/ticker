@@ -26,14 +26,22 @@ struct ContentView: View {
             }
             .navigationSplitViewColumnWidth(min: 170, ideal: 190)
             .scrollContentBackground(.hidden)
+            .safeAreaInset(edge: .top) { titleBarSpacer }
         } detail: {
             detail
+                .safeAreaInset(edge: .top) { titleBarSpacer }
         }
         .background(Theme.backdrop)
         // System blue fights the monochrome palette.
         .tint(Theme.up.opacity(0.6))
         .preferredColorScheme(.dark)
         .task { client.start() }
+    }
+
+    /// The window draws its content full height, so the traffic lights and the
+    /// window title land on top of the first row without this.
+    private var titleBarSpacer: some View {
+        Color.clear.frame(height: 34)
     }
 
     @ViewBuilder
@@ -138,6 +146,7 @@ struct AssetRow: View {
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(Theme.direction(asset.quotePrice.changePercent))
                 }
+                .frame(width: 170, alignment: .trailing)
 
                 ProvenanceTag(source: source, age: age)
             }
@@ -170,17 +179,18 @@ struct AssetRow: View {
         var stats: [Stat] = []
 
         if asset.quotePrice.pricePrevClose != 0 {
-            stats.append(Stat("prev", asset.quotePrice.pricePrevClose.price(variable)))
+            stats.append(Stat("prev", asset.quotePrice.pricePrevClose.price(variable), width: 120))
         }
 
         if asset.quotePrice.priceOpen != 0 {
-            stats.append(Stat("open", asset.quotePrice.priceOpen.price(variable)))
+            stats.append(Stat("open", asset.quotePrice.priceOpen.price(variable), width: 120))
         }
 
         if asset.quotePrice.priceDayHigh != 0, asset.quotePrice.priceDayLow != 0 {
             stats.append(Stat(
                 "day",
-                asset.quotePrice.priceDayLow.price(variable) + "–" + asset.quotePrice.priceDayHigh.price(variable)
+                asset.quotePrice.priceDayLow.price(variable) + "–" + asset.quotePrice.priceDayHigh.price(variable),
+                width: 190
             ))
         }
 
@@ -189,16 +199,17 @@ struct AssetRow: View {
                 "52wk",
                 asset.quoteExtended.fiftyTwoWeekLow.price(variable)
                     + "–"
-                    + asset.quoteExtended.fiftyTwoWeekHigh.price(variable)
+                    + asset.quoteExtended.fiftyTwoWeekHigh.price(variable),
+                width: 200
             ))
         }
 
         if asset.quoteExtended.marketCap != 0 {
-            stats.append(Stat("mcap", asset.quoteExtended.marketCap.abbreviated))
+            stats.append(Stat("mcap", asset.quoteExtended.marketCap.abbreviated, width: 130))
         }
 
         if asset.quoteExtended.volume != 0 {
-            stats.append(Stat("vol", asset.quoteExtended.volume.abbreviated))
+            stats.append(Stat("vol", asset.quoteExtended.volume.abbreviated, width: 130))
         }
 
         return stats
@@ -206,15 +217,16 @@ struct AssetRow: View {
 
     private var positionStats: [Stat] {
         [
-            Stat("qty", asset.position.quantity.price(variable)),
-            Stat("avg", asset.position.unitCost.price(variable)),
-            Stat("value", asset.position.value.price(false)),
-            Stat("weight", asset.position.weight.signedPercent.replacingOccurrences(of: "+", with: "")),
+            Stat("qty", asset.position.quantity.price(variable), width: 120),
+            Stat("avg", asset.position.unitCost.price(variable), width: 120),
+            Stat("value", asset.position.value.price(false), width: 190),
+            Stat("weight", asset.position.weight.signedPercent.replacingOccurrences(of: "+", with: ""), width: 130),
             Stat(
                 "total",
                 asset.position.totalChange.amount.signed(false)
                     + " "
                     + asset.position.totalChange.percent.signedPercent,
+                width: 200,
                 highlighted: true
             ),
             Stat(
@@ -222,6 +234,7 @@ struct AssetRow: View {
                 asset.position.dayChange.amount.signed(false)
                     + " "
                     + asset.position.dayChange.percent.signedPercent,
+                width: 200,
                 highlighted: true
             )
         ]
@@ -232,11 +245,13 @@ struct Stat: Identifiable {
     let id = UUID()
     let label: String
     let value: String
+    let width: CGFloat
     let highlighted: Bool
 
-    init(_ label: String, _ value: String, highlighted: Bool = false) {
+    init(_ label: String, _ value: String, width: CGFloat = 130, highlighted: Bool = false) {
         self.label = label
         self.value = value
+        self.width = width
         self.highlighted = highlighted
     }
 }
@@ -246,7 +261,7 @@ struct StatStrip: View {
     var tint: Color = Theme.primaryText
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 8) {
             ForEach(items) { item in
                 HStack(spacing: 5) {
                     Text(item.label.uppercased())
@@ -256,7 +271,10 @@ struct StatStrip: View {
                     Text(item.value)
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(item.highlighted ? tint : Theme.primaryText.opacity(0.75))
+
+                    Spacer(minLength: 0)
                 }
+                .frame(width: item.width, alignment: .leading)
             }
 
             Spacer(minLength: 0)

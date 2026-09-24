@@ -289,6 +289,24 @@ $ ticker --config=./.ticker.yaml print
 * Ensure there is at least one lot in the configuration file in order to generate output
 * A specific config file can be specified with the `--config` flag
 
+### Serving quotes to a GUI client
+
+`ticker serve` runs the monitor headlessly and exposes it over a loopback HTTP API, so a desktop or web client can consume the same quotes the terminal UI shows. The terminal commands are unaffected.
+
+```sh
+ticker serve                              # random port on 127.0.0.1
+ticker serve --address 127.0.0.1:8899 --token devtoken
+```
+
+| Endpoint | Description |
+|---|---|
+|`GET /quotes`|Current assets, position summary, and per-symbol data source|
+|`GET /stream`|Server-sent events; the full snapshot on connect and on every quote update|
+
+Every request needs the bearer token, either as `Authorization: Bearer <token>` or as a `?token=` query parameter — browsers cannot set headers on an `EventSource`. Unless `--token` is passed, a token is generated per run and written, with the listening URL, to `serve.json` in the state directory (`~/Library/Application Support/ticker/` on macOS) with owner-only permissions. The file is removed on shutdown.
+
+Asset fields serialize under their Go names (`Symbol`, `QuotePrice`, ...) since they come from the shared domain type.
+
 ## Notes
 
 * **Market data delay**

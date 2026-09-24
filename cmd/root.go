@@ -9,6 +9,7 @@ import (
 	"github.com/achannarasappa/ticker/v5/internal/cli"
 	c "github.com/achannarasappa/ticker/v5/internal/common"
 	"github.com/achannarasappa/ticker/v5/internal/print"
+	"github.com/achannarasappa/ticker/v5/internal/server"
 	"github.com/achannarasappa/ticker/v5/internal/ui"
 )
 
@@ -22,6 +23,7 @@ var (
 	config       c.Config
 	options      cli.Options
 	optionsPrint print.Options
+	optionsServe server.Options
 	err          error
 	rootCmd      = &cobra.Command{
 		Version: Version,
@@ -37,6 +39,13 @@ var (
 		PreRun: initContext,
 		Args:   cli.Validate(&config, &options, &err),
 		Run:    print.Run(&dep, &ctx, &optionsPrint),
+	}
+	serveCmd = &cobra.Command{
+		Use:    "serve",
+		Short:  "Serves quotes over a loopback HTTP API for GUI clients",
+		PreRun: initContext,
+		Args:   cli.Validate(&config, &options, &err),
+		Run:    server.Run(&dep, &ctx, &optionsServe),
 	}
 	summaryCmd = &cobra.Command{
 		Use:    "summary",
@@ -76,7 +85,12 @@ func init() { //nolint: gochecknoinits
 	printCmd.PersistentFlags().StringVar(&configPath, "config", "", "config file (default is $HOME/.ticker.yaml)")
 	printCmd.AddCommand(summaryCmd)
 
+	serveCmd.Flags().StringVar(&optionsServe.Address, "address", "127.0.0.1:0", "address to listen on (loopback only unless you know why)")
+	serveCmd.Flags().StringVar(&optionsServe.Token, "token", "", "bearer token clients must send (default: generated per run)")
+	serveCmd.Flags().StringVar(&configPath, "config", "", "config file (default is $HOME/.ticker.yaml)")
+
 	rootCmd.AddCommand(printCmd)
+	rootCmd.AddCommand(serveCmd)
 }
 
 func initConfig() {

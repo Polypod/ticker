@@ -28,3 +28,6 @@
 !.planning/phases
 !.planning/phases/999.1-ibkr-position-synchronization-adapter
 !.planning/phases/999.1-ibkr-position-synchronization-adapter/.gitkeep
+
+# Generated per-directory agent context files
+CLAUDE.md

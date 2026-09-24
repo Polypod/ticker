@@ -14,15 +14,41 @@ enum Theme {
         value < 0 ? down : up
     }
 
-    /// The layered backdrop the glass reads against. Glass over a flat fill
-    /// looks like a grey rectangle; it needs something to refract.
+    /// Soft colour behind the panels. Glass refracts what is under it, so a
+    /// flat dark fill renders as a grey rectangle — these glows are what make
+    /// the effect read as glass at all.
     static var backdrop: some View {
-        LinearGradient(
-            colors: [backgroundAccent, background],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        ZStack {
+            LinearGradient(
+                colors: [backgroundAccent, background],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            glow(Color(red: 0.25, green: 0.55, blue: 0.75), size: 760)
+                .offset(x: -240, y: -260)
+
+            glow(Color(red: 0.45, green: 0.30, blue: 0.70), size: 680)
+                .offset(x: 300, y: 180)
+
+            glow(up, size: 460)
+                .offset(x: 120, y: -320)
+        }
         .ignoresSafeArea()
+    }
+
+    private static func glow(_ color: Color, size: CGFloat) -> some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [color.opacity(0.38), color.opacity(0.0)],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: size / 2
+                )
+            )
+            .frame(width: size, height: size)
+            .blur(radius: 70)
     }
 }
 

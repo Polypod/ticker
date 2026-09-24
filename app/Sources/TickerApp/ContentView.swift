@@ -26,6 +26,8 @@ struct ContentView: View {
             }
             .navigationSplitViewColumnWidth(min: 170, ideal: 190)
             .scrollContentBackground(.hidden)
+            // System blue fights the monochrome palette.
+            .tint(Theme.up.opacity(0.55))
         } detail: {
             detail
         }

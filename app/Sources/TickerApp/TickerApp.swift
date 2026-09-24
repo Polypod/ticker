@@ -7,7 +7,8 @@ struct TickerApp: App {
             ContentView()
                 .frame(minWidth: 420, minHeight: 320)
         }
-        .defaultSize(width: 980, height: 640)
+        // 16:9, matching the concept's proportions rather than a square window.
+        .defaultSize(width: 1280, height: 720)
         .windowStyle(.hiddenTitleBar)
     }
 }

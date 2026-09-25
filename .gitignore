@@ -29,6 +29,7 @@ app/.swiftpm
 .env
 !.planning
 !.planning/ROADMAP.md
+!.planning/HANDOFF.md
 !.planning/phases
 !.planning/phases/999.1-ibkr-position-synchronization-adapter
 !.planning/phases/999.1-ibkr-position-synchronization-adapter/.gitkeep

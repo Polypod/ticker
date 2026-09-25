@@ -34,7 +34,6 @@ enum Theme {
             glow(up, size: 460)
                 .offset(x: 120, y: -320)
         }
-        .ignoresSafeArea()
     }
 
     private static func glow(_ color: Color, size: CGFloat) -> some View {

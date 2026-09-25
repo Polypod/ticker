@@ -36,7 +36,7 @@ struct ContentView: View {
     /// The window draws its content full height, so the traffic lights and the
     /// window title land on top of the first row without this.
     private var titleBarSpacer: some View {
-        Color.clear.frame(height: 34)
+        Color.clear.frame(height: 10)
     }
 
     /// Hand-rolled rather than a `List`: inside a split view the list manages
@@ -47,7 +47,7 @@ struct ContentView: View {
             // A real laid-out view, not padding: the sidebar container
             // collapses top padding, which is how the traffic lights kept
             // landing on the first row.
-            Color.clear.frame(height: 44)
+            Color.clear.frame(height: 10)
 
             ForEach(Section.allCases) { item in
                 Button {
@@ -76,6 +76,7 @@ struct ContentView: View {
     private var detail: some View {
         ZStack {
             Theme.backdrop
+                .ignoresSafeArea()
 
             switch client.state {
             case .searching:
